@@ -5,13 +5,19 @@ from time import sleep
 import os
 import logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler()
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+logger = logging.getLogger('devman_checker_bot')
+
+
+class TelegramLogsHandler(logging.Handler):
+
+    def __init__(self, tg_bot, chat_id):
+        super().__init__()
+        self.chat_id = chat_id
+        self.tg_bot = tg_bot
+
+    def emit(self, record):
+        log_entry = self.format(record)
+        self.tg_bot.send_message(chat_id=self.chat_id, text=log_entry)
 
 
 def send_message(bot, chat_id, message):
@@ -19,7 +25,6 @@ def send_message(bot, chat_id, message):
 
 
 def main():
-
     load_dotenv()
     devmn_token = os.getenv('DEVMN_API_TOKEN')
     tg_bot_token = os.getenv('TG_BOT_TOKEN')
@@ -30,6 +35,12 @@ def main():
         return
 
     bot = Bot(token=tg_bot_token)
+
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(TelegramLogsHandler(bot, tg_chat_id))
+
+    logger.info('The bot is running')
 
     while True:
         try:
@@ -60,8 +71,7 @@ def main():
                 logger.exception(f'Timeout {result_check["timestamp_to_request"]}')
                 params['timestamp'] = result_check['timestamp_to_request']
         except requests.exceptions.ReadTimeout:
-            logger.warning('ReadTimeout occurred, retrying in 5 seconds...')
-            sleep(5)
+            pass
         except requests.exceptions.ConnectionError as e:
             logger.error(f'ConnectionError: {e}, retrying in 5 seconds...')
             sleep(5)
